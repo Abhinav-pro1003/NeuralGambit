@@ -76,31 +76,100 @@ class History:
     def is_win(self):
         # check if the board position is a win for either players
         # Feel free to implement this in anyway if needed
-        pass
+
+        for i in range(3):
+            cntx = 0
+            cnto = 0
+            for j in range(3):
+                if self.board[3*i+j] == 'x':
+                    cntx += 1
+                if self.board[3*i+j] == 'o':
+                    cnto += 1
+            if cntx ==3:
+                return 'x'
+            elif cnto == 3:
+                return 'o'
+        
+        for j in range(3):
+            cntx = 0
+            cnto = 0
+            for i in range(3):
+                if self.board[3*i+j] == 'x':
+                    cntx += 1
+                if self.board[3*i+j] == 'o':
+                    cnto += 1
+            if cntx ==3:
+                return 'x'
+            elif cnto == 3:
+                return 'o'
+        
+        cntx = 0
+        cnto = 0
+        for i in range(3):
+            if self.board[4*i] == 'x':
+                    cntx += 1
+            if self.board[4*i] == 'o':
+                cnto += 1
+        if cntx ==3:
+            return 'x'
+        elif cnto == 3:
+            return 'o'
+
+        cntx = 0
+        cnto = 0
+        for i in range(3):
+            if self.board[2*i+2] == 'x':
+                    cntx += 1
+            if self.board[2*i+2] == 'o':
+                cnto += 1
+        if cntx ==3:
+            return 'x'
+        elif cnto == 3:
+            return 'o'
+        return '0'
 
     def is_draw(self):
         # check if the board position is a draw
         # Feel free to implement this in anyway if needed
-        pass
+        return self.is_win() == '0' and '0' not in self.board
+        
 
     def get_valid_actions(self):
         # get the empty squares from the board
         # Feel free to implement this in anyway if needed
-        pass
+        actions = []
+        for i in range(3):
+            for j in range(3):
+                if self.board[3*i+j] == '0':
+                    actions.append(3*i+j)
+        return actions
 
     def is_terminal_history(self):
         # check if the history is a terminal history
         # Feel free to implement this in anyway if needed
-        pass
+        if self.is_win()!='0' or self.is_draw():
+            return True
+        return False
 
     def get_utility_given_terminal_history(self):
         # Feel free to implement this in anyway if needed
-        pass
+        winner = self.is_win()
+
+        if winner == 'x':
+            return 1
+        if winner == 'o':
+            return -1
+        return 0    
+        
 
     def update_history(self, action):
         # In case you need to create a deepcopy and update the history obj to get the next history object.
         # Feel free to implement this in anyway if needed
-        pass
+        self.history.append(action)
+        self.board = self.get_board()
+        self.player = self.current_player()
+        return
+        
 
 
 def backward_induction(history_obj):
@@ -122,8 +191,52 @@ def backward_induction(history_obj):
     # actions. But since tictactoe is a PIEFG, there always exists an optimal deterministic strategy (SPNE). So your
     # policy will be something like this {"0": 1, "1": 0, "2": 0, "3": 0, "4": 0, "5": 0, "6": 0, "7": 0, "8": 0} where
     # "0" was the one of the best actions for the current player/history.
-    return -2
     # TODO implement
+
+    his = ""
+
+    for h in history_obj.history:
+        his += str(h)
+
+    if history_obj.is_terminal_history():
+        u = history_obj.get_utility_given_terminal_history()
+        return u
+
+    actions = history_obj.get_valid_actions()
+    if history_obj.current_player() == 'x':
+        best_u = -math.inf
+    else:
+        best_u = math.inf
+    best_action = -1
+    priority = [4, 0, 2, 6, 8, 1, 3, 5, 7, -1]
+
+    for a in actions:
+        new_hist = copy.deepcopy(history_obj)
+        new_hist.update_history(a)
+        u = backward_induction(new_hist)
+        if history_obj.current_player() == 'x':
+            if u > best_u:
+                best_u = u
+                best_action = a
+            elif u == best_u:
+                if priority.index(a) < priority.index(best_action):
+                    best_action = a
+        else:
+            if u < best_u:
+                best_u = u
+                best_action = a
+            elif u == best_u:
+                if priority.index(a) < priority.index(best_action):
+                    best_action = a
+    
+    if history_obj.current_player() == 'x':
+        strategy_dict_x[his] = {"0": 0, "1": 0, "2": 0, "3": 0, "4": 0, "5": 0, "6": 0, "7": 0, "8": 0}
+        strategy_dict_x[his][str(best_action)] = 1
+    else:
+        strategy_dict_o[his] = {"0": 0, "1": 0, "2": 0, "3": 0, "4": 0, "5": 0, "6": 0, "7": 0, "8": 0}
+        strategy_dict_o[his][str(best_action)] = 1
+    
+    return best_u
 
 
 def solve_tictactoe():
