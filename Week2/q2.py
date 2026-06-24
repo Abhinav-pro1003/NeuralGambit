@@ -9,6 +9,8 @@ logging.basicConfig(format='%(levelname)s - %(asctime)s - %(message)s', datefmt=
 # value represents the maxmin value. Use the get_boards_str function in History class to get the key corresponding to
 # self.boards.
 board_positions_val_dict = {}
+# Internal cache for maxmin symmetry-equivalent positions. The public dict above still uses the PDF-required raw keys.
+canonical_board_positions_val_dict = {}
 # Global variable to store the visited histories in the process of alpha beta pruning.
 visited_histories_list = []
 
@@ -158,21 +160,58 @@ class History:
             boards_str = boards_str + ''.join([str(j) for j in self.boards[i]])
         return boards_str
 
+    @staticmethod
+    def _canonical_board_str(board):
+        transforms = [
+            [0, 1, 2, 3, 4, 5, 6, 7, 8],
+            [6, 3, 0, 7, 4, 1, 8, 5, 2],
+            [8, 7, 6, 5, 4, 3, 2, 1, 0],
+            [2, 5, 8, 1, 4, 7, 0, 3, 6],
+            [2, 1, 0, 5, 4, 3, 8, 7, 6],
+            [6, 7, 8, 3, 4, 5, 0, 1, 2],
+            [0, 3, 6, 1, 4, 7, 2, 5, 8],
+            [8, 5, 2, 7, 4, 1, 6, 3, 0],
+        ]
+        return min(''.join(board[i] for i in transform) for transform in transforms)
+
+    def get_canonical_boards_str(self):
+        board_strings = [self._canonical_board_str(board) for board in self.boards]
+        board_strings.sort()
+        return ''.join(board_strings)
+
     def is_win(self):
         # Feel free to implement this in anyway if needed
-        pass
+        return all(board_stat == 0 for board_stat in self.active_board_stats)
 
     def get_valid_actions(self):
         # Feel free to implement this in anyway if needed
-        pass
+        actions = []
+        move_order = [4, 0, 2, 6, 8, 1, 3, 5, 7]
+        for pos in move_order:
+            for board_num in range(self.num_boards):
+                if self.active_board_stats[board_num] == 0:
+                    continue
+                if self.boards[board_num][pos] == '0':
+                    actions.append(9 * board_num + pos)
+        return actions
 
     def is_terminal_history(self):
         # Feel free to implement this in anyway if needed
-        pass
+        return self.is_win()
 
     def get_value_given_terminal_history(self):
         # Feel free to implement this in anyway if needed
-        pass
+        if not self.is_terminal_history():
+            raise ValueError("Value requested for a non-terminal history")
+
+        # In Notakto, the player who completes the last active board loses.
+        # self.current_player is the next player to move, so that player wins.
+        return 1 if self.current_player == 1 else -1
+
+    def update_history(self, action):
+        new_history = copy.deepcopy(self.history)
+        new_history.append(action)
+        return History(num_boards=self.num_boards, history=new_history)
 
 
 def alpha_beta_pruning(history_obj, alpha, beta, max_player_flag):
@@ -189,9 +228,27 @@ def alpha_beta_pruning(history_obj, alpha, beta, max_player_flag):
     # These two already given lines track the visited histories.
     global visited_histories_list
     visited_histories_list.append(history_obj.history)
-    # TODO implement
-    return -2
-    # TODO implement
+
+    if history_obj.is_terminal_history():
+        return history_obj.get_value_given_terminal_history()
+
+    actions = history_obj.get_valid_actions()
+    if max_player_flag:
+        value = -math.inf
+        for action in actions:
+            value = max(value, alpha_beta_pruning(history_obj.update_history(action), alpha, beta, False))
+            alpha = max(alpha, value)
+            if alpha >= beta:
+                break
+        return value
+
+    value = math.inf
+    for action in actions:
+        value = min(value, alpha_beta_pruning(history_obj.update_history(action), alpha, beta, True))
+        beta = min(beta, value)
+        if alpha >= beta:
+            break
+    return value
 
 
 def maxmin(history_obj, max_player_flag):
@@ -205,14 +262,37 @@ def maxmin(history_obj, max_player_flag):
     # Global variable to keep track of visited board positions. This is a dictionary with keys as str version of
     # self.boards and value represents the maxmin value. Use the get_boards_str function in History class to get
     # the key corresponding to self.boards.
-    global board_positions_val_dict
-    # TODO implement
-    return -2
-    # TODO implement
+    global board_positions_val_dict, canonical_board_positions_val_dict
+    board_key = history_obj.get_boards_str()
+    if board_key in board_positions_val_dict:
+        return board_positions_val_dict[board_key]
+
+    canonical_key = (history_obj.get_canonical_boards_str(), max_player_flag)
+    if canonical_key in canonical_board_positions_val_dict:
+        value = canonical_board_positions_val_dict[canonical_key]
+        board_positions_val_dict[board_key] = value
+        return value
+
+    if history_obj.is_terminal_history():
+        value = history_obj.get_value_given_terminal_history()
+        board_positions_val_dict[board_key] = value
+        canonical_board_positions_val_dict[canonical_key] = value
+        return value
+
+    actions = history_obj.get_valid_actions()
+    if max_player_flag:
+        value = max(maxmin(history_obj.update_history(action), False) for action in actions)
+    else:
+        value = min(maxmin(history_obj.update_history(action), True) for action in actions)
+
+    board_positions_val_dict[board_key] = value
+    canonical_board_positions_val_dict[canonical_key] = value
+    return value
 
 
 def solve_alpha_beta_pruning(history_obj, alpha, beta, max_player_flag):
     global visited_histories_list
+    visited_histories_list = []
     val = alpha_beta_pruning(history_obj, alpha, beta, max_player_flag)
     return val, visited_histories_list
 

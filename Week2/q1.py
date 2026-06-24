@@ -2,6 +2,7 @@ import json
 import copy  # use it for deepcopy if needed
 import math  # for math.inf
 import logging
+from pathlib import Path
 
 logging.basicConfig(format='%(levelname)s - %(asctime)s - %(message)s', datefmt='%d-%b-%y %H:%M:%S',
                     level=logging.INFO)
@@ -241,9 +242,10 @@ def backward_induction(history_obj):
 
 def solve_tictactoe():
     backward_induction(History())
-    with open('./policy_x.json', 'w') as f:
+    output_dir = Path(__file__).resolve().parent
+    with open(output_dir / 'policy_x.json', 'w') as f:
         json.dump(strategy_dict_x, f)
-    with open('./policy_o.json', 'w') as f:
+    with open(output_dir / 'policy_o.json', 'w') as f:
         json.dump(strategy_dict_o, f)
     return strategy_dict_x, strategy_dict_o
 
